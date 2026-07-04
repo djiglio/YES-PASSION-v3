@@ -93,6 +93,37 @@ def clean_league_name(name):
     if pd.isna(name): return name
     return str(name).strip()
 
+# 8. Mappatura della Lega (usando league_id)
+# 13 = Serie A, 14 = Serie B, 16 = Ligue 1, 19 = Bundesliga, 31 = Primera Division, 53 = La Liga, 9 = Premier League... ecc
+league_mapping = {
+    13: 'Serie A',
+    14: 'Serie B',
+    31: 'La Liga', # In FIFA 15, Spanish league might be 31 or 53
+    53: 'La Liga',
+    9: 'Premier League',
+    16: 'Ligue 1',
+    19: 'Bundesliga',
+    10: 'Championship',
+    17: 'Ligue 2',
+    20: '2. Bundesliga',
+    32: 'Segunda Division',
+    41: 'Eredivisie',
+    189: 'Super League',
+    308: 'Primeira Liga',
+    330: 'EFL League One',
+}
+
+# Add default fallback, and separate Brazilian Serie A
+def map_league(row):
+    l_name = league_mapping.get(row['league_id'], row['league_name'])
+    if l_name == 'Serie A' or l_name == 'Campeonato Brasileiro Série A' or l_name == 'Liga do Brasil':
+        # List of known Italian teams across recent history
+        italian_teams = ['Udinese', 'Sassuolo', 'Juventus', 'Milan', 'Roma', 'Hellas Verona', 'Empoli', 'Torino', 'Atalanta', 'Bologna', 'Lazio', 'Fiorentina', 'Napoli', 'Como', 'Inter', 'Frosinone', 'Cagliari', 'Genoa', 'Salernitana', 'Lecce', 'Monza', 'AC Milan', 'Parma', 'Hellas Verona FC', 'Venezia', 'Sampdoria', 'Spezia', 'Crotone', 'Benevento', 'SPAL', 'Chievo Verona', 'Palermo', 'Pescara', 'Carpi', 'Cesena', 'Brescia', 'Catania', 'Siena', 'Livorno', 'Novara', 'Bari', 'Reggina', 'Cremonese']
+        if row['club_name'] not in italian_teams:
+            return 'Serie A Brasil'
+        return 'Serie A'
+    return l_name
+
 def map_roles(positions_str):
     if pd.isna(positions_str): return ""
     
