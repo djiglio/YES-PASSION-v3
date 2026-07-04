@@ -135,8 +135,19 @@ def contains_all_words(search_str, target_str):
     target_words = target_str.replace('.', ' ').split()
     return all(w in target_words for w in words)
 
+def fix_encoding(s):
+    if not isinstance(s, str): return s
+    try:
+        return s.encode('latin1').decode('utf-8')
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return s
+
 print("Loading data...")
 df_hist = pd.read_csv(r'C:\Users\Edoardo\OneDrive\Desktop\YES PASSION - v2 multiplayer\male_players.csv', encoding='latin1', low_memory=False)
+df_hist['short_name'] = df_hist['short_name'].apply(fix_encoding)
+df_hist['long_name'] = df_hist['long_name'].apply(fix_encoding)
+df_hist['nationality_name'] = df_hist['nationality_name'].apply(fix_encoding)
+df_hist['club_name'] = df_hist['club_name'].apply(fix_encoding)
 
 df_new = pd.read_csv(r'C:\Users\Edoardo\OneDrive\Desktop\YES PASSION - v2 multiplayer\fifa_fbref_merged.csv', low_memory=False)
 df_new = df_new[df_new['season'] == 2425].copy()
