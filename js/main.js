@@ -1,0 +1,363 @@
+import { GameState, GAME_PHASES } from './state/GameState.js';
+import { DraftUI } from './ui/DraftUI.js';
+import { SeasonUI } from './ui/SeasonUI.js';
+import { AuthUI } from './ui/AuthUI.js';
+import { LobbyUI } from './ui/LobbyUI.js';
+import { MultiplayerDraftUI } from './ui/MultiplayerDraftUI.js';
+import { MultiplayerSeasonUI } from './ui/MultiplayerSeasonUI.js';
+import { LeaderboardUI } from './ui/LeaderboardUI.js';
+
+window.sanitizeHTML = function(str) {
+    if (typeof str !== 'string') return str;
+    return str.replace(/[&<>"']/g, function(match) {
+        const escape = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        };
+        return escape[match];
+    });
+};
+
+window.showAlert = function(message) {
+    let modal = document.getElementById('custom-alert-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'custom-alert-modal';
+        modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,20,50,0.8); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); z-index: 9999; display: flex; justify-content: center; align-items: center;';
+        
+        const content = document.createElement('div');
+        content.className = 'cl-card';
+        content.style.cssText = 'background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 10px 30px rgba(0,0,0,0.5); padding: 2.5rem 2rem; border-radius: 16px; width: 90%; max-width: 450px; color: white; display: flex; flex-direction: column; gap: 1.8rem; text-align: center;';
+        
+        const msgEl = document.createElement('p');
+        msgEl.id = 'custom-alert-message';
+        msgEl.style.cssText = 'margin: 0; font-size: 1.1rem; color: #f3f4f6; line-height: 1.6;';
+        
+        const btnContainer = document.createElement('div');
+        btnContainer.style.cssText = 'display: flex; justify-content: center; margin-top: 0.5rem;';
+        
+        const btnOk = document.createElement('button');
+        btnOk.textContent = 'OK';
+        btnOk.style.cssText = 'padding: 0.8rem 3rem; font-size: 1.1rem; font-weight: 600; letter-spacing: 1px; border-radius: 30px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.3); color: white; cursor: pointer; transition: all 0.2s ease;';
+        btnOk.onmouseover = () => btnOk.style.background = 'rgba(255, 255, 255, 0.2)';
+        btnOk.onmouseout = () => btnOk.style.background = 'rgba(255, 255, 255, 0.1)';
+        
+        btnOk.onclick = () => {
+            modal.style.display = 'none';
+        };
+        
+        btnContainer.appendChild(btnOk);
+        content.appendChild(msgEl);
+        content.appendChild(btnContainer);
+        modal.appendChild(content);
+        document.body.appendChild(modal);
+    }
+    
+    document.getElementById('custom-alert-message').textContent = message;
+    modal.style.display = 'flex';
+};
+
+class GameApp {
+    constructor() {
+        this.state = new GameState();
+        this.state.subscribe(this.render.bind(this));
+        
+        this.authUI = new AuthUI(this);
+        
+        this.init();
+    }
+
+    async init() {
+        const globalBackBtn = document.getElementById('global-back-btn');
+        if (globalBackBtn) {
+            globalBackBtn.onclick = () => this.handleBack();
+        }
+
+        this.state.setPhase(GAME_PHASES.INIT);
+        
+        // Check Auth Session
+        const isLoggedIn = await this.authUI.checkSession();
+        if (isLoggedIn) {
+            this.startHome();
+        } else {
+            this.authUI.render();
+        }
+    }
+
+    startHome() {
+        this.state.setPhase('HOME'); // Placeholder for Home Menu
+    }
+
+    startMultiplayerLobby() {
+        this.state.setPhase('MP_LOBBY');
+    }
+
+    startMultiplayerDraft(lobby, players, teamName) {
+        this.state.mpLobby = lobby;
+        this.state.mpPlayers = players;
+        this.state.teamName = teamName;
+        this.state.setPhase('MP_DRAFT');
+    }
+
+    startMultiplayerSeason() {
+        this.state.setPhase('MP_SEASON_INIT');
+    }
+
+    startLeaderboard() {
+        this.state.setPhase('LEADERBOARD');
+    }
+
+    getCurrentUI() {
+        switch(this.state.phase) {
+            case 'LEADERBOARD': return this.leaderboardUI;
+            case 'MP_LOBBY': return this.lobbyUI;
+            case 'MP_DRAFT': return this.mpDraftUI;
+            case 'MP_SEASON_INIT': return this.mpSeasonUI;
+            case GAME_PHASES.DRAFT: return this.draftUI;
+            case GAME_PHASES.SEASON_INIT: return this.seasonUI;
+            default: return null;
+        }
+    }
+
+    handleBack() {
+        const currentUI = this.getCurrentUI();
+        if (currentUI && typeof currentUI.handleBack === 'function') {
+            if (currentUI.handleBack()) return; // If it returns true, it intercepted the back event
+        }
+        this.state.goBack();
+    }
+
+    render(state) {
+        const statusBar = document.getElementById('current-phase');
+        const content = document.getElementById('game-content');
+
+        if (statusBar) {
+            statusBar.textContent = `Fase Attuale: ${state.phase}`;
+        }
+
+        const globalHeader = document.getElementById('global-header');
+        if (globalHeader) {
+            // Hide only on INIT and HOME
+            globalHeader.style.display = (state.phase === GAME_PHASES.INIT || state.phase === 'HOME') ? 'none' : 'flex';
+        }
+
+        switch(state.phase) {
+            case GAME_PHASES.INIT:
+                // loader handled in index.html
+                break;
+            case 'HOME':
+                this.renderHomeMenu(content);
+                break;
+            case 'LEADERBOARD':
+                if (!this.leaderboardUI) {
+                    this.leaderboardUI = new LeaderboardUI(this, content);
+                }
+                this.leaderboardUI.init();
+                break;
+            case 'MP_LOBBY':
+                if (!this.lobbyUI) {
+                    this.lobbyUI = new LobbyUI(this, content);
+                }
+                this.lobbyUI.init();
+                break;
+            case 'MP_DRAFT':
+                if (!this.mpDraftUI) {
+                    this.mpDraftUI = new MultiplayerDraftUI(this, content);
+                    this.mpDraftUI.init();
+                }
+                break;
+            case 'MP_SEASON_INIT':
+                if (!this.mpSeasonUI) {
+                    this.mpSeasonUI = new MultiplayerSeasonUI(this, content);
+                    this.mpSeasonUI.init();
+                }
+                break;
+            case GAME_PHASES.DRAFT:
+                if (!this.draftUI) {
+                    this.draftUI = new DraftUI(state, content);
+                    this.draftUI.init();
+                }
+                break;
+            case GAME_PHASES.SEASON_INIT:
+                if (!this.seasonUI) {
+                    this.seasonUI = new SeasonUI(state, content);
+                    this.seasonUI.init();
+                }
+                break;
+        }
+    }
+
+    renderHomeMenu(content) {
+        // Clear all cached UIs to ensure fresh render when navigating back
+        this.draftUI = null;
+        this.lobbyUI = null;
+        this.mpDraftUI = null;
+        this.mpSeasonUI = null;
+        this.seasonUI = null;
+        this.leaderboardUI = null;
+
+        content.innerHTML = `
+            <div class="setup-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 70vh;">
+                <img src="assets/logo.png" alt="Yes Passion Logo" style="max-width: 200px; margin-bottom: 1rem; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5));">
+                <h1 class="setup-title" style="margin-bottom: 0.5rem; text-align: center; text-shadow: 0 0 20px rgba(255,255,255,0.3); font-size: 1.5rem; letter-spacing: 2px;">BENTORNATO, <span id="display-username">${this.authUI.profile?.username?.toUpperCase() || 'MANAGER'}</span></h1>
+                
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem;">
+                    <button id="btn-edit-user" class="btn btn-secondary" style="width: 200px; padding: 0.4rem 1rem; font-size: 0.8rem; border-radius: 20px; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: all 0.3s ease; color: white;">MODIFICA PROFILO</button>
+                    <button id="btn-leaderboard" class="btn btn-primary" style="width: 200px; padding: 0.4rem 1rem; font-size: 0.8rem; border-radius: 20px; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: all 0.3s ease; color: white;">CLASSIFICHE</button>
+                </div>
+
+                <div id="profile-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,20,50,0.8); backdrop-filter: blur(10px); z-index: 1000; justify-content: center; align-items: center;">
+                    <div style="background: linear-gradient(145deg, #0a192f, #020c1b); border: 1px solid rgba(255,255,255,0.2); padding: 2rem; border-radius: 16px; width: 90%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                        <h2 style="color: white; margin-bottom: 1.5rem; text-align: center;">MODIFICA PROFILO</h2>
+                        <div style="display: flex; flex-direction: column; gap: 1rem;">
+                            <div>
+                                <label style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 0.3rem; display: block;">Nome Utente</label>
+                                <input type="text" id="input-username" value="${window.sanitizeHTML(this.authUI.profile?.username || '')}" maxlength="20" style="width: 100%; padding: 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.5); color: white;">
+                            </div>
+                            <div>
+                                <label style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 0.3rem; display: block;">Nome Squadra (Es: FC Dream Team)</label>
+                                <input type="text" id="input-teamname" value="${window.sanitizeHTML(this.authUI.profile?.team_name || '')}" maxlength="20" style="width: 100%; padding: 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.5); color: white;">
+                            </div>
+                            <div>
+                                <label style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 0.3rem; display: block;">Abbreviazione Squadra (Es: JUV, MIL - 3 Lettere)</label>
+                                <input type="text" id="input-teamabbr" value="${window.sanitizeHTML(this.authUI.profile?.team_abbr || '')}" maxlength="3" style="width: 100%; padding: 0.8rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.5); color: white; text-transform: uppercase;">
+                            </div>
+                            <div>
+                                <label style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 0.3rem; display: block;">Cambio Password (Opzionale)</label>
+                                <div style="position: relative; margin-bottom: 0.5rem;">
+                                    <input type="password" id="input-password" placeholder="Nuova password" style="width: 100%; padding: 0.8rem; padding-right: 2.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.5); color: white;">
+                                    <span onclick="const x=document.getElementById('input-password'); x.type=x.type==='password'?'text':'password'; this.style.opacity=x.type==='password'?'0.5':'1';" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: white; opacity: 0.5; user-select: none; display: flex; align-items: center;" title="Mostra/Nascondi Password">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    </span>
+                                </div>
+                                <div style="position: relative;">
+                                    <input type="password" id="input-password-confirm" placeholder="Conferma nuova password" style="width: 100%; padding: 0.8rem; padding-right: 2.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.5); color: white;">
+                                    <span onclick="const x=document.getElementById('input-password-confirm'); x.type=x.type==='password'?'text':'password'; this.style.opacity=x.type==='password'?'0.5':'1';" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: white; opacity: 0.5; user-select: none; display: flex; align-items: center;" title="Mostra/Nascondi Password">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    </span>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                                <button id="btn-save-profile" class="btn btn-primary" style="flex: 1;">Salva</button>
+                                <button id="btn-close-modal" class="btn btn-secondary" style="flex: 1;">Annulla</button>
+                            </div>
+                            <div id="profile-error" style="color: #ef4444; font-size: 0.9rem; margin-top: 0.5rem; text-align: center;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <p style="text-align: center; color: var(--text-muted); margin-bottom: 1rem; font-size: 1rem;">Seleziona una modalità di gioco</p>
+                
+                <div class="setup-modes" style="max-width: 800px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 1rem;">
+                    
+                    <button id="btn-sp" class="cl-card" style="width: 100%; border: 1px solid rgba(255, 255, 255, 0.3); padding: 1.2rem 1rem; border-radius: 16px; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); cursor: pointer; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.3rem; transition: all 0.3s ease;">
+                        <span style="background: linear-gradient(135deg, #e2e8f0 0%, #ffffff 50%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 500; font-size: 1.4rem; letter-spacing: 2px; filter: drop-shadow(0 0 10px rgba(255,255,255,0.4));">SINGLE PLAYER</span>
+                        <span style="color: #cbd5e1; font-size: 0.85rem;">Gioca da solo e competi nelle Leaderboard.</span>
+                    </button>
+                    
+                    <button id="btn-mp" class="cl-card" style="width: 100%; border: 1px solid rgba(255, 255, 255, 0.3); padding: 1.2rem 1rem; border-radius: 16px; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); cursor: pointer; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.3rem; transition: all 0.3s ease;">
+                        <span style="background: linear-gradient(135deg, #e2e8f0 0%, #ffffff 50%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 500; font-size: 1.4rem; letter-spacing: 2px; filter: drop-shadow(0 0 10px rgba(255,255,255,0.4));">MULTIPLAYER</span>
+                        <span style="color: #cbd5e1; font-size: 0.85rem;">Crea o unisciti a una lobby con gli amici.</span>
+                    </button>
+                    
+                    <button id="btn-logout" class="btn btn-secondary" style="margin-top: 1rem; padding: 0.4rem 1rem; font-size: 0.8rem; width: 120px; margin-left: auto; margin-right: auto; display: block; border-radius: 20px; background: rgba(239, 68, 68, 0.05); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(239, 68, 68, 0.3); box-shadow: 0 4px 15px rgba(0,0,0,0.2); color: #ef4444; transition: all 0.3s ease;">Logout</button>
+                </div>
+            </div>
+        `;
+
+        const requireTeamName = () => {
+            if (!this.authUI.profile?.team_name || !this.authUI.profile?.team_abbr) {
+                window.showAlert("Per giocare devi prima impostare il Nome della tua Squadra e la sua Abbreviazione!");
+                document.getElementById('profile-modal').style.display = 'flex';
+                return false;
+            }
+            if (this.authUI.profile.team_abbr.length !== 3) {
+                window.showAlert("L'abbreviazione deve essere di esattamente 3 lettere!");
+                document.getElementById('profile-modal').style.display = 'flex';
+                return false;
+            }
+            return true;
+        };
+
+        document.getElementById('btn-sp').onclick = () => {
+            if (requireTeamName()) {
+                this.state.teamName = this.authUI.profile.team_name;
+                this.state.teamAbbr = this.authUI.profile.team_abbr;
+                this.state.setPhase(GAME_PHASES.DRAFT);
+            }
+        };
+        
+        document.getElementById('btn-mp').onclick = () => {
+            if (requireTeamName()) {
+                this.startMultiplayerLobby();
+            }
+        };
+
+        const btnLeaderboard = document.getElementById('btn-leaderboard');
+        if (btnLeaderboard) {
+            btnLeaderboard.onclick = () => {
+                this.startLeaderboard();
+            };
+        }
+        
+        document.getElementById('btn-logout').onclick = () => {
+            this.authUI.logout();
+        };
+
+        const modal = document.getElementById('profile-modal');
+        document.getElementById('btn-edit-user').onclick = () => {
+            modal.style.display = 'flex';
+        };
+        document.getElementById('btn-close-modal').onclick = () => {
+            modal.style.display = 'none';
+        };
+
+        document.getElementById('btn-save-profile').onclick = async () => {
+            const btn = document.getElementById('btn-save-profile');
+            const errorDiv = document.getElementById('profile-error');
+            const newName = document.getElementById('input-username').value.trim();
+            const newTeam = document.getElementById('input-teamname').value.trim();
+            const newAbbr = document.getElementById('input-teamabbr').value.trim().toUpperCase();
+            const newPwd = document.getElementById('input-password').value;
+            const confirmPwd = document.getElementById('input-password-confirm').value;
+
+            if (!newName || !newTeam) {
+                errorDiv.textContent = "Nome Utente e Nome Squadra sono obbligatori.";
+                return;
+            }
+
+            if (newPwd !== "" && newPwd !== confirmPwd) {
+                errorDiv.textContent = "Le password non coincidono!";
+                return;
+            }
+
+            if (newAbbr && newAbbr.length !== 3) {
+                errorDiv.textContent = "L'abbreviazione deve essere di 3 lettere esatte.";
+                return;
+            }
+
+            btn.textContent = "Salvataggio...";
+            errorDiv.textContent = "";
+
+            const err = await this.authUI.updateProfile(newName, newTeam, newAbbr, newPwd);
+            if (err) {
+                errorDiv.textContent = err.message || "Errore nel salvataggio.";
+                btn.textContent = "Salva";
+            } else {
+                document.getElementById('display-username').textContent = newName.toUpperCase();
+                document.getElementById('input-password').value = "";
+                document.getElementById('input-password-confirm').value = "";
+                modal.style.display = 'none';
+                btn.textContent = "Salva";
+            }
+        };
+    }
+}
+
+// Bootstrap
+document.addEventListener('DOMContentLoaded', () => {
+    window.app = new GameApp();
+});

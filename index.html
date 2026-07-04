@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yes Passion - Football Manager</title>
+    
+    <!-- App Icons & Manifest -->
+    <link rel="icon" type="image/png" href="assets/icon.png">
+    <link rel="apple-touch-icon" href="assets/icon.png">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a1a2e">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Bebas+Neue&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/cl_styles.css">
+    
+    <!-- Supabase JS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        window.onerror = function(msg, url, line, col, error) {
+            const errDiv = document.createElement('div');
+            errDiv.style = "position:absolute; top:0; left:0; background:red; color:white; z-index:9999; padding:10px; width:100%;";
+            errDiv.innerHTML = "JS Error: " + msg + " at line " + line;
+            document.body.appendChild(errDiv);
+        };
+        window.addEventListener("unhandledrejection", function(e) {
+            const errDiv = document.createElement('div');
+            errDiv.style = "position:absolute; top:40px; left:0; background:orange; color:white; z-index:9999; padding:10px; width:100%;";
+            errDiv.innerHTML = "Promise Error: " + (e.reason ? e.reason.message : "Unknown");
+            document.body.appendChild(errDiv);
+        });
+    </script>
+    <!-- Modern Fonts applied globally -->
+</head>
+<body>
+    <div class="video-background">
+        <video id="bg-video" src="assets/bg_video.mp4" autoplay loop muted playsinline disablePictureInPicture></video>
+    </div>
+    
+    <div class="cl-stars-container">
+        <div class="starball"></div>
+    </div>
+    <div id="app" class="app-container">
+        <header id="global-header" style="display: none; position: relative; padding: 20px 20px; width: 100%; box-sizing: border-box; background: transparent; border: none; z-index: 2000; flex-direction: row; justify-content: space-between; align-items: center; pointer-events: none;">
+            <div id="global-back-btn" style="margin: 0; font-weight: 600; font-size: 1rem; cursor: pointer; color: rgba(255,255,255,0.8); transition: color 0.2s; display: flex; align-items: center; gap: 0.3rem; padding: 0.5rem; pointer-events: auto;">
+                <span style="font-size: 1.4rem; line-height: 1;">&larr;</span> Indietro
+            </div>
+            <div id="global-header-right" style="display: flex; align-items: center; pointer-events: auto;"></div>
+        </header>        <!-- MAIN CONTENT AREA (Dynamic) -->
+        <main id="game-content" class="game-content">
+            <div class="loader">Caricamento Dati...</div>
+        </main>
+
+        <!-- FOOTER -->
+        <footer class="main-footer">
+            <p>&copy; Yes Passion - Developed by Bunker Corp.</p>
+        </footer>
+    </div>
+
+    <!-- ENTRY POINT -->
+    <script type="module" src="js/main.js?v=9"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const bgVideo = document.getElementById('bg-video');
+            if (bgVideo) {
+                bgVideo.playbackRate = 0.5;
+            }
+        });
+    </script>
+</body>
+</html>
